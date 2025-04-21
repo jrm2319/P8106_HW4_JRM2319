@@ -1,0 +1,14 @@
+---
+title: "Data Science II: Homework 4"
+output: pdf_document
+Name: Jasmin Martinez
+Date: 04/20/2025
+---
+Name: Jasmin Martinez (JRM2319)
+Date: 04/01/25
+
+Set up 
+```{r}
+
+```
+
