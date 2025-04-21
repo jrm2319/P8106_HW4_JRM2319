@@ -35,6 +35,7 @@ head(trainData)
 ```
 
 #### 1.A: Build a regression tree on the training data to predict the response (10pts). Create a plot of the tree (10pts).
+
 ```{r}
 set.seed(1)
 tree1 = rpart(formula = Outstate ~ . - College, 
@@ -56,11 +57,17 @@ plot(as.party(tree3)) #another visual
 summary(tree3) # summary of Tree3 (the final condensed version of the regression tree)
 ```
 
-
-
 #### 1.B: Perform random forest on the training data (10pts). Report the variable importance (5pts) and the test error (5pts).
+```{r}
+
+```
+Variable importance 
+Test error
 
 #### 1.C: Perform boosting on the training data (10pts). Report the variable importance (5pts) and the test error (5pts).
+```{r}
+
+```
 
 ### QUESTION 2: This problem is based on the data “auto.csv” in Homework 3. Split the dataset into two parts: training data (70%) and test data (30%).
 
