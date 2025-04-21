@@ -14,7 +14,7 @@ Date: 04/20/25
 College = read.csv("College.csv")
 head(College)
 ```
-```{r}
+```{r include=FALSE}
 library(caret)
 library(tidymodels)
 library(ISLR)
