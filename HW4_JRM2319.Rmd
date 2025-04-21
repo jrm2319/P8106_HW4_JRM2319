@@ -11,11 +11,52 @@ Date: 04/20/25
 
 ```{r}
 # initial data steps--importing and partitioning
+College = read.csv("College.csv")
+head(College)
+```
+```{r}
+library(caret)
+library(tidymodels)
+library(ISLR)
+library(mlbench)
+library(caret)
+library(tidymodels)
+library(rpart)
+library(rpart.plot)
+library(party)
+library(partykit)
+library(pROC)
+```
+```{r}
+datSplit = initial_split(data = College, prop = 0.8)
+trainData = training(datSplit)
+testData = testing(datSplit)
+head(trainData)
+```
 
+#### 1.A: Build a regression tree on the training data to predict the response (10pts). Create a plot of the tree (10pts).
+```{r}
+set.seed(1)
+tree1 = rpart(formula = Outstate ~ . - College, 
+              data = trainData, 
+              control = rpart.control(cp=0))
+rpart.plot(tree1) #this gives the full tree, but we want a more complex and smaller tree
+```
+```{r}
+printcp(tree1)
+cpTable = tree1$cptable
+plotcp(tree1)
+```
+```{r}
+# Picking the cp that yields the minimum cross-validation error
+minErr = which.min(cpTable[,4])
+tree3 = rpart::prune(tree1, cp = cpTable[minErr,1])
+rpart.plot(tree3)
+plot(as.party(tree3)) #another visual 
+summary(tree3) # summary of Tree3 (the final condensed version of the regression tree)
 ```
 
 
-#### 1.A: Build a regression tree on the training data to predict the response (10pts). Create a plot of the tree (10pts).
 
 #### 1.B: Perform random forest on the training data (10pts). Report the variable importance (5pts) and the test error (5pts).
 
