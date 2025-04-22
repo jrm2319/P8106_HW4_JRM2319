@@ -21,6 +21,10 @@ library(ISLR)
 library(mlbench)
 library(caret)
 library(tidymodels)
+library(randomForest)
+library(ranger)
+library(gbm)
+library(pdp)
 library(rpart)
 library(rpart.plot)
 library(party)
@@ -59,18 +63,176 @@ summary(tree3) # summary of Tree3 (the final condensed version of the regression
 
 #### 1.B: Perform random forest on the training data (10pts). Report the variable importance (5pts) and the test error (5pts).
 ```{r}
+set.seed(1)
+bagging = randomForest(Outstate ~ . - College,
+                       data = trainData,
+                       mtry = 16)
 
+set.seed(1)
+rf = randomForest(Outstate ~ . - College,
+                       data = trainData,
+                       mtry = 5)
+
+set.seed(1)
+rf2 = ranger(Outstate ~ . - College,
+                       data = trainData,
+                       mtry = 5)
+
+pred.rf = predict(rf, newdata = testData)
+pred.rf2 = predict(rf2, data = testData)$predictions
+
+# Test Error: 
+RMSE(pred.rf, testData$Outstate)
+RMSE(pred.rf2, testData$Outstate)
 ```
-Variable importance 
-Test error
+```{r}
+ctrl = trainControl(method = "cv")
+
+rf.grid = expand.grid(mtry = 1:16,
+                      splitrule = "variance",
+                      min.node.size = 1:5)
+
+set.seed(1)
+rf.fit = train(Outstate ~ . - College, 
+               data = trainData,
+               method = "ranger",
+               tuneGrid = rf.grid,
+               trControl = ctrl)
+
+ggplot(rf.fit, highlight = TRUE)
+```
+```{r}
+#Extracting the variable importance from permutting
+set.seed(1)
+rf2.final.per = ranger(Outstate ~ . - College, 
+                      data = trainData,
+                      mtry = rf.fit$bestTune[[1]],
+                      splitrule = "variance",
+                      min.node.size = rf.fit$bestTune[[3]],
+                      importance = "permutation",
+                      scale.permutation.importance = TRUE)
+
+barplot(sort(ranger::importance(rf2.final.per), decreasing = FALSE),
+        las = 2, horiz = TRUE, cex.names = 0.7,
+        col = colorRampPalette(colors=c("cyan", "blue"))(16))
+```
+```{r}
+#Extracting the variable importance from node impurities
+
+set.seed(1)
+  rf2.final.imp = ranger(Outstate ~ . - College, 
+                          data = trainData,
+                          mtry = rf.fit$bestTune[[1]],
+                          splitrule = "variance",
+                          min.node.size = rf.fit$bestTune[[3]],
+                          importance = "impurity")
+  
+barplot(sort(ranger::importance(rf2.final.imp), decreasing = FALSE),
+        las = 2, horiz = TRUE, cex.names = 0.7,
+        col = colorRampPalette(colors = c("cyan","blue"))(16))
+```
 
 #### 1.C: Perform boosting on the training data (10pts). Report the variable importance (5pts) and the test error (5pts).
 ```{r}
+set.seed(1)
+bst = gbm(Outstate ~ . - College,
+          data = trainData,
+          distribution = "gaussian",
+          n.trees = 5000,
+          interaction.depth = 2,
+          shrinkage = 0.005, 
+          cv.folds =10)
 
+gbm.perf(bst, method = "cv")
+```
+```{r}
+ctrl = trainControl(method = "cv")
+
+gbm.grid = expand.grid(n.trees = c(100,200,500,1000,2000,5000,10000),
+                        interaction.depth = 1:4,
+                        shrinkage = c(0.005,0.01,0.05),
+                        n.minobsinnode = c(10))
+
+set.seed(1)
+gbm.fit = train(Outstate ~ . - College,
+                data = trainData,
+                method = "gbm",
+                tuneGrid = gbm.grid,
+                trControl = ctrl,
+                verbose = FALSE
+                )
+
+ggplot(gbm.fit, highlight = TRUE)
+```
+```{r}
+summary(gbm.fit$finalModel, las = 2, cBars = 19, cex.names = 0.6)
+```
+### QUESTION 2: This problem is based on the data “auto.csv” in Homework 3. Split the dataset into two parts: training data (70%) and test data (30%).
+```{r}
+# initial data steps--importing and partitioning
+auto = read.csv("auto.csv")
+head(auto)
+```
+```{r}
+datSplit = initial_split(data = auto, prop = 0.7)
+trainData_auto = training(datSplit)
+testData_auto = testing(datSplit)
+head(trainData_auto)
 ```
 
-### QUESTION 2: This problem is based on the data “auto.csv” in Homework 3. Split the dataset into two parts: training data (70%) and test data (30%).
+#### 2.A:  Build a classification tree using the training data, with mpg cat as the response (10pts). Which mpg category corresponds to the lowest cross-validation error? Is this the same as the tree size obtained using the 1 SE rule (10pts)?
+```{r}
+set.seed(1)
+mpg1 = rpart(formula = mpg_cat ~ ., 
+              data = trainData_auto,
+              control = rpart.control(cp=0))
 
-#### 2.A:  Build a classification tree using the training data, with mpg cat as the response (10pts). Which tree size corresponds to the lowest cross-validation error? Is this the same as the tree size obtained using the 1 SE rule (10pts)?
+cpTable = printcp(mpg1)
+```
+```{r}
+plotcp(mpg1)
+```
 
+```{r}
+minErr = which.min(cpTable[,4])
+mpg2 = rpart::prune(mpg1, cp = cpTable[minErr,1])
+rpart.plot(mpg2)
+```
 #### 2.B: Perform boosting on the training data and report the variable importance (10pts). Report the test data performance (10pts).
+```{r}
+# Boosting 
+trainData_auto$mpg_bin <- ifelse(trainData_auto$mpg_cat == "low", 0, 1)
+
+set.seed(1)
+bst = gbm(mpg_bin ~ .,
+           data = trainData_auto[, !names(trainData_auto) %in% "mpg_cat"],
+           distribution = "adaboost",
+           n.trees = 2000,
+           interaction.depth = 2,
+           shrinkage = 0.005,
+           cv.folds = 10)
+
+gbm.perf(bst, method = "cv")
+```
+```{r}
+# Convert mpg_bin to factor (required for classification in ranger)
+trainData_auto$mpg_bin <- factor(ifelse(trainData_auto$mpg_cat == "low", 0, 1))
+
+# Optional: drop mpg_cat to prevent leakage
+trainData_rf <- trainData_auto[, !names(trainData_auto) %in% "mpg_cat"]
+
+# Fit final random forest
+set.seed(1)
+rf2.final.per <- ranger(mpg_bin ~ ., 
+                        data = trainData_rf,
+                        mtry = 7,
+                        splitrule = "gini",  # Classification rule
+                        min.node.size = rf.fit$bestTune[[3]],
+                        importance = "permutation",
+                        scale.permutation.importance = TRUE)
+
+# Plot variable importance
+barplot(sort(ranger::importance(rf2.final.per), decreasing = FALSE),
+        las = 2, horiz = TRUE, cex.names = 0.7,
+        col = colorRampPalette(colors = c("cyan", "blue"))(16))
+```
